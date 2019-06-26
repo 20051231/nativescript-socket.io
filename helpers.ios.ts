@@ -1,59 +1,36 @@
 'use strict';
 
 export function serialize(data: any): any {
-  switch (typeof data) {
-    case 'string':
-    case 'boolean':
-    case 'number':
-      return data;
-    case 'object':
+    if (data === null || data === undefined) return NSNull.alloc();
+    if (typeof data !== 'object') return data;
+  
+    //{ "a": undefined } is serialized to { "a": null }
+    //if (Array.isArray(data)) return NSArray.arrayWithArray(data);
+    //return NSDictionary.dictionaryWithDictionary(data);
 
-      if (data instanceof Date) {
-        return data.toJSON();
-      }
+    const json = JSON.stringify(data);
+    const buf = new NSString({ string: json }).dataUsingEncoding(NSUTF8StringEncoding)
 
-      if (!data) {
-        return NSNull.new();
-      }
-
-      if (Array.isArray(data)) {
-        return NSArray.arrayWithArray(data.map(serialize));
-      }
-
-      let node = {};
-      Object.keys(data).forEach(function(key) {
-        let value = data[key];
-        node[key] = serialize(value);
-      });
-      return NSDictionary.dictionaryWithDictionary(node);
-
-    default:
-      return NSNull.new();
-  }
+    const dict = NSJSONSerialization.JSONObjectWithDataOptionsError(
+        buf,
+        null
+    );
+    
+    return dict;
 }
 
 
-export function deserialize(nativeData: any): any {
-  if (nativeData instanceof NSNull) {
-    return null;
-  }
-
-  if (nativeData instanceof NSArray) {
-    let array = [];
-    for (let i = 0, n = nativeData.count; i < n; i++) {
-      array[i] = deserialize(nativeData.objectAtIndex(i));
-    };
-    return array;
-  }
-
-  if (nativeData instanceof NSDictionary) {
-    let dict = {};
-    for (let i = 0, n = nativeData.allKeys.count; i < n; i++) {
-      let key = nativeData.allKeys.objectAtIndex(i);
-      dict[key] = deserialize(nativeData.objectForKey(key));
-    };
-    return dict;
-  }
-
-  return nativeData;
+export function deserialize(dict: any): any {
+    if (dict instanceof NSNull) {
+        return null;
+    }
+    const data = NSJSONSerialization.dataWithJSONObjectOptionsError(
+        dict,
+        null
+    );
+    const ns = NSString.alloc().initWithDataEncoding(
+        data,
+        NSUTF8StringEncoding
+    );
+    return JSON.parse(ns.toString());
 }
